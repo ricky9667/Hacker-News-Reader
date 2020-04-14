@@ -1,7 +1,6 @@
 package com.example.hackernewsreader;
 
-import androidx.appcompat.app.AppCompatActivity;
-
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -9,18 +8,20 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import okhttp3.*;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -35,6 +36,8 @@ public class MainActivity extends AppCompatActivity {
     ArrayList<String> urlList = new ArrayList<>();
     ArrayAdapter newsListAdapter;
 
+    int numberOfViews;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,14 +47,22 @@ public class MainActivity extends AppCompatActivity {
         newsListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, newsList);
         listView.setAdapter(newsListAdapter);
 
-        // listView onClick listeners
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+               startNewsActivity(urlList.get(position));
+            }
+        });
+
+        callHackerNewsList();
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        callHackerNewsList();
-//        newsListAdapter.notifyDataSetChanged();
+    public void startNewsActivity(String newsUrl) {
+//        Log.i("News URL", newsUrl);
+
+        Intent intent = new Intent(getApplicationContext(), NewsActivity.class);
+        intent.putExtra("newsUrl", newsUrl);
+        startActivity(intent);
     }
 
     public void resetList(View view) {
@@ -78,13 +89,16 @@ public class MainActivity extends AppCompatActivity {
                 s = s.substring(2, s.length()-2);
                 String[] idList = s.split(", ");
 
-                for(int i=0; i<idList.length; i++) {
-                    callHackerNewsDetail(idList[i]);
+                int size = 20;
+                if (idList.length < size) {
+                    size = idList.length;
                 }
 
-//                callHackerNewsDetail(idList[0]);
-
-                Log.i("News ID List", Arrays.toString(idList));
+                for(int i=0; i<size; i++) {
+                    callHackerNewsDetail(idList[i]);
+                    Log.i("News Order", Integer.toString(i));
+                }
+//                Log.i("News ID List", Arrays.toString(idList));
             }
         });
     }
@@ -95,30 +109,22 @@ public class MainActivity extends AppCompatActivity {
                 .url(NEWS_DETAIL_START + newsId + NEWS_DETAIL_END)
                 .build();
 
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                e.printStackTrace();
-            }
+        try {
+            Response response = client.newCall(request).execute();
+            String s = response.body().string();
 
-            @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-                String s = response.body().string();
-                try {
-                    JSONObject json = new JSONObject(s);
-                    String newsTitle = json.getString("title");
-                    String newsUrl = json.getString("url");
+            JSONObject json = new JSONObject(s);
+            String newsTitle = json.getString("title");
+            String newsUrl = json.getString("url");
 
-                    newsList.add(newsTitle);
-                    urlList.add(newsUrl);
+            newsList.add(newsTitle);
+            urlList.add(newsUrl);
 
-                    Log.i("News Title", newsTitle);
-                    Log.i("News URL", newsUrl);
+            Log.i("News Title", newsTitle);
+            Log.i("News URL", newsUrl);
 
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        } catch (IOException | JSONException e) {
+            e.printStackTrace();
+        }
     }
 }
