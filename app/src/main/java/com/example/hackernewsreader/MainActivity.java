@@ -1,24 +1,24 @@
 package com.example.hackernewsreader;
 
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
 
-import okhttp3.Call;
-import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -30,13 +30,15 @@ public class MainActivity extends AppCompatActivity {
     static final String NEWS_DETAIL_END = ".json?print=pretty";
 
     OkHttpClient client = new OkHttpClient();
+//    DownloadTask newsTask;
 
     ListView listView;
     ArrayList<String> newsList = new ArrayList<>();
     ArrayList<String> urlList = new ArrayList<>();
     ArrayAdapter newsListAdapter;
 
-    int numberOfViews;
+    int loadedNews = 0;
+    String[] idList = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,81 +52,85 @@ public class MainActivity extends AppCompatActivity {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-               startNewsActivity(urlList.get(position));
+                startNewsActivity(urlList.get(position));
             }
         });
 
-        callHackerNewsList();
+        DownloadTask newsTask = new DownloadTask();
+        Toast.makeText(this, "Loading your news...", Toast.LENGTH_LONG).show();
+        newsTask.execute();
+    }
+
+    public void loadNews(View view) {
+        DownloadTask newsTask = new DownloadTask();
+        Toast.makeText(this, "Loading your news...", Toast.LENGTH_LONG).show();
+        newsTask.execute();
     }
 
     public void startNewsActivity(String newsUrl) {
 //        Log.i("News URL", newsUrl);
-
         Intent intent = new Intent(getApplicationContext(), NewsActivity.class);
         intent.putExtra("newsUrl", newsUrl);
         startActivity(intent);
     }
 
-    public void resetList(View view) {
-        newsListAdapter.notifyDataSetChanged();
-    }
+    public class DownloadTask extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... urls) {
 
-    private void callHackerNewsList() {
+            if (idList == null) {
 
-        final Request request = new Request.Builder()
-                .url(NEWS_LIST)
-                .build();
+                Request request = new Request.Builder()
+                        .url(NEWS_LIST)
+                        .build();
 
-        client.newCall(request).enqueue(new Callback() {
-            // execute: sync, enqueue: async
-            @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                try {
+                    Response response = client.newCall(request).execute();
+                    String s = response.body().string();
+                    s = s.substring(2, s.length() - 2);
+                    idList = s.split(", ");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            for (int i = loadedNews; i < loadedNews + 20; i++) {
+                callHackerNewsDetail(idList[i]);
+                Log.i("News Order", Integer.toString(i));
+            }
+            loadedNews += 20;
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            newsListAdapter.notifyDataSetChanged();
+        }
+
+        private void callHackerNewsDetail(final String newsId) {
+
+            final Request request = new Request.Builder()
+                    .url(NEWS_DETAIL_START + newsId + NEWS_DETAIL_END)
+                    .build();
+
+            try {
+                Response response = client.newCall(request).execute();
+                String s = response.body().string();
+
+                JSONObject json = new JSONObject(s);
+                String newsTitle = json.getString("title");
+                String newsUrl = json.getString("url");
+
+                newsList.add(newsTitle);
+                urlList.add(newsUrl);
+
+                Log.i("News Title", newsTitle);
+                Log.i("News URL", newsUrl);
+
+            } catch (IOException | JSONException e) {
                 e.printStackTrace();
             }
-
-            @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-
-                String s = response.body().string();
-                s = s.substring(2, s.length()-2);
-                String[] idList = s.split(", ");
-
-                int size = 20;
-                if (idList.length < size) {
-                    size = idList.length;
-                }
-
-                for(int i=0; i<size; i++) {
-                    callHackerNewsDetail(idList[i]);
-                    Log.i("News Order", Integer.toString(i));
-                }
-//                Log.i("News ID List", Arrays.toString(idList));
-            }
-        });
-    }
-
-    private void callHackerNewsDetail(final String newsId) {
-
-        final Request request = new Request.Builder()
-                .url(NEWS_DETAIL_START + newsId + NEWS_DETAIL_END)
-                .build();
-
-        try {
-            Response response = client.newCall(request).execute();
-            String s = response.body().string();
-
-            JSONObject json = new JSONObject(s);
-            String newsTitle = json.getString("title");
-            String newsUrl = json.getString("url");
-
-            newsList.add(newsTitle);
-            urlList.add(newsUrl);
-
-            Log.i("News Title", newsTitle);
-            Log.i("News URL", newsUrl);
-
-        } catch (IOException | JSONException e) {
-            e.printStackTrace();
         }
     }
 }
