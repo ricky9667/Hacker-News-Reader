@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
@@ -30,12 +31,12 @@ public class MainActivity extends AppCompatActivity {
     static final String NEWS_DETAIL_END = ".json?print=pretty";
 
     OkHttpClient client = new OkHttpClient();
-//    DownloadTask newsTask;
 
     ListView listView;
     ArrayList<String> newsList = new ArrayList<>();
     ArrayList<String> urlList = new ArrayList<>();
     ArrayAdapter newsListAdapter;
+    Button button;
 
     int loadedNews = 0;
     String[] idList = null;
@@ -45,10 +46,12 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        button = findViewById(R.id.loadMoreButton);
+
         listView = findViewById(R.id.newsListView);
         newsListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, newsList);
-        listView.setAdapter(newsListAdapter);
 
+        listView.setAdapter(newsListAdapter);
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -57,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
         });
 
         DownloadTask newsTask = new DownloadTask();
+        button.setAlpha(0.4f);
         Toast.makeText(this, "Loading your news...", Toast.LENGTH_LONG).show();
         newsTask.execute();
     }
@@ -64,6 +68,10 @@ public class MainActivity extends AppCompatActivity {
     public void loadNews(View view) {
         DownloadTask newsTask = new DownloadTask();
         Toast.makeText(this, "Loading your news...", Toast.LENGTH_LONG).show();
+
+        view.setAlpha(0.4f);
+        view.setEnabled(false);
+
         newsTask.execute();
     }
 
@@ -106,6 +114,9 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
             newsListAdapter.notifyDataSetChanged();
+
+            button.setAlpha(1.0f);
+            button.setEnabled(true);
         }
 
         private void callHackerNewsDetail(final String newsId) {
